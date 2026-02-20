@@ -1,0 +1,361 @@
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+  <meta charset="UTF-8"/>
+  <title>Configuration – Bump Chart</title>
+  <script src="https://cdn.jsdelivr.net/gh/tableau/extensions-api/lib/tableau.extensions.1.latest.js"></script>
+  <style>
+    @import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap');
+
+    *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+
+    body {
+      font-family: 'Inter', system-ui, sans-serif;
+      background: #ffffff;
+      color: #0f172a;
+      padding: 24px;
+      min-height: 100vh;
+    }
+
+    h1 {
+      font-size: 18px;
+      font-weight: 700;
+      margin-bottom: 6px;
+      color: #0f172a;
+    }
+
+    .subtitle {
+      font-size: 12px;
+      color: #64748b;
+      margin-bottom: 28px;
+    }
+
+    .section {
+      margin-bottom: 28px;
+    }
+
+    .section-title {
+      font-size: 11px;
+      font-weight: 700;
+      letter-spacing: 1.2px;
+      text-transform: uppercase;
+      color: #94a3b8;
+      margin-bottom: 12px;
+    }
+
+    /* Background selector */
+    .bg-options {
+      display: flex;
+      gap: 10px;
+      flex-wrap: wrap;
+    }
+
+    .bg-option {
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      gap: 6px;
+      cursor: pointer;
+    }
+
+    .bg-swatch {
+      width: 48px;
+      height: 48px;
+      border-radius: 10px;
+      border: 2.5px solid transparent;
+      transition: border-color 0.15s, transform 0.15s;
+    }
+
+    .bg-option.selected .bg-swatch,
+    .bg-option:hover .bg-swatch {
+      border-color: #3b82f6;
+      transform: scale(1.08);
+    }
+
+    .bg-label {
+      font-size: 10px;
+      color: #64748b;
+      font-weight: 500;
+    }
+
+    /* Max lines slider */
+    .slider-wrap {
+      display: flex;
+      align-items: center;
+      gap: 14px;
+    }
+
+    input[type="range"] {
+      flex: 1;
+      accent-color: #3b82f6;
+      height: 4px;
+    }
+
+    .slider-val {
+      font-size: 18px;
+      font-weight: 700;
+      color: #3b82f6;
+      width: 28px;
+      text-align: center;
+    }
+
+    /* Color palette */
+    .color-grid {
+      display: grid;
+      grid-template-columns: repeat(5, 1fr);
+      gap: 8px;
+    }
+
+    .color-slot {
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      gap: 4px;
+    }
+
+    .color-slot label {
+      font-size: 10px;
+      color: #94a3b8;
+    }
+
+    .color-slot input[type="color"] {
+      width: 42px;
+      height: 42px;
+      border: 2px solid #e2e8f0;
+      border-radius: 8px;
+      padding: 2px;
+      cursor: pointer;
+      background: none;
+    }
+
+    /* Custom bg color */
+    .custom-bg-row {
+      display: none;
+      align-items: center;
+      gap: 10px;
+      margin-top: 10px;
+    }
+
+    .custom-bg-row.visible { display: flex; }
+
+    .custom-bg-row input[type="color"] {
+      width: 48px;
+      height: 36px;
+      border: 2px solid #e2e8f0;
+      border-radius: 8px;
+      padding: 2px;
+      cursor: pointer;
+    }
+
+    .custom-bg-row label {
+      font-size: 12px;
+      color: #64748b;
+    }
+
+    /* Preset palettes */
+    .palette-presets {
+      display: flex;
+      gap: 8px;
+      margin-bottom: 12px;
+      flex-wrap: wrap;
+    }
+
+    .preset-btn {
+      display: flex;
+      gap: 3px;
+      padding: 5px 10px;
+      border: 1.5px solid #e2e8f0;
+      border-radius: 20px;
+      cursor: pointer;
+      font-size: 10px;
+      background: white;
+      align-items: center;
+      gap: 6px;
+      transition: border-color 0.15s;
+      font-family: 'Inter', system-ui;
+    }
+
+    .preset-btn:hover { border-color: #3b82f6; }
+
+    .preset-dots {
+      display: flex;
+      gap: 2px;
+    }
+
+    .preset-dot {
+      width: 8px; height: 8px;
+      border-radius: 50%;
+    }
+
+    /* Buttons */
+    .btn-row {
+      display: flex;
+      gap: 10px;
+      margin-top: 32px;
+    }
+
+    .btn {
+      flex: 1;
+      padding: 10px;
+      border-radius: 8px;
+      font-size: 13px;
+      font-weight: 600;
+      cursor: pointer;
+      border: none;
+      font-family: 'Inter', system-ui;
+      transition: opacity 0.15s;
+    }
+
+    .btn:hover { opacity: 0.85; }
+
+    .btn-primary { background: #3b82f6; color: white; }
+    .btn-secondary { background: #f1f5f9; color: #475569; }
+  </style>
+</head>
+<body>
+  <h1>⚙️ Configuration</h1>
+  <p class="subtitle">Personnalise l'apparence du Bump Chart</p>
+
+  <!-- BACKGROUND -->
+  <div class="section">
+    <div class="section-title">Fond</div>
+    <div class="bg-options">
+      <div class="bg-option" data-bg="dark" onclick="selectBg('dark')">
+        <div class="bg-swatch" style="background:#0f172a; box-shadow:0 0 0 1px #334155 inset;"></div>
+        <span class="bg-label">Sombre</span>
+      </div>
+      <div class="bg-option" data-bg="light" onclick="selectBg('light')">
+        <div class="bg-swatch" style="background:#f8fafc; box-shadow:0 0 0 1px #e2e8f0 inset;"></div>
+        <span class="bg-label">Clair</span>
+      </div>
+      <div class="bg-option" data-bg="navy" onclick="selectBg('navy')">
+        <div class="bg-swatch" style="background:#0a1628;"></div>
+        <span class="bg-label">Navy</span>
+      </div>
+      <div class="bg-option" data-bg="slate" onclick="selectBg('slate')">
+        <div class="bg-swatch" style="background:#1e293b;"></div>
+        <span class="bg-label">Slate</span>
+      </div>
+      <div class="bg-option" data-bg="custom" onclick="selectBg('custom')">
+        <div class="bg-swatch" style="background: linear-gradient(135deg, #f0f, #0ff, #0f0);"></div>
+        <span class="bg-label">Perso</span>
+      </div>
+    </div>
+    <div class="custom-bg-row" id="custom-bg-row">
+      <input type="color" id="customBgColor" value="#1a1a2e"/>
+      <label>Choisir une couleur de fond</label>
+    </div>
+  </div>
+
+  <!-- MAX LINES -->
+  <div class="section">
+    <div class="section-title">Nombre de lignes max</div>
+    <div class="slider-wrap">
+      <input type="range" id="maxLines" min="3" max="12" value="6"
+        oninput="document.getElementById('maxLinesVal').textContent = this.value"/>
+      <div class="slider-val" id="maxLinesVal">6</div>
+    </div>
+  </div>
+
+  <!-- COLOR PALETTE -->
+  <div class="section">
+    <div class="section-title">Couleurs des lignes</div>
+    <div class="palette-presets" id="presets"></div>
+    <div class="color-grid" id="colorGrid"></div>
+  </div>
+
+  <div class="btn-row">
+    <button class="btn btn-secondary" onclick="cancel()">Annuler</button>
+    <button class="btn btn-primary" onclick="save()">Appliquer</button>
+  </div>
+
+  <script>
+    const PALETTES = {
+      "Tableau": ["#4e79a7","#f28e2b","#e15759","#76b7b2","#59a14f","#edc948","#b07aa1","#ff9da7","#9c755f","#bab0ac"],
+      "Vivid":   ["#e63946","#457b9d","#2a9d8f","#e9c46a","#f4a261","#264653","#a8dadc","#ffb703","#fb8500","#219ebc"],
+      "Pastel":  ["#a8dadc","#ffd6a5","#caffbf","#fdffb6","#c8b6ff","#ffc8dd","#bde0fe","#b5ead7","#ffb3c6","#d4a5a5"],
+      "Mono":    ["#ffffff","#d4d4d8","#a1a1aa","#71717a","#52525b","#3f3f46","#27272a","#18181b","#09090b","#000000"],
+    };
+
+    let currentBg = 'dark';
+    let currentColors = [...PALETTES["Tableau"]];
+
+    function selectBg(bg) {
+      currentBg = bg;
+      document.querySelectorAll('.bg-option').forEach(el => el.classList.remove('selected'));
+      document.querySelector(`[data-bg="${bg}"]`).classList.add('selected');
+      const customRow = document.getElementById('custom-bg-row');
+      customRow.classList.toggle('visible', bg === 'custom');
+    }
+
+    function buildColorGrid(colors) {
+      currentColors = [...colors];
+      const grid = document.getElementById('colorGrid');
+      grid.innerHTML = '';
+      colors.forEach((c, i) => {
+        grid.innerHTML += `
+          <div class="color-slot">
+            <input type="color" value="${c}" oninput="currentColors[${i}] = this.value"/>
+            <label>Ligne ${i+1}</label>
+          </div>`;
+      });
+    }
+
+    function buildPresets() {
+      const container = document.getElementById('presets');
+      Object.entries(PALETTES).forEach(([name, colors]) => {
+        const btn = document.createElement('button');
+        btn.className = 'preset-btn';
+        btn.innerHTML = `
+          <div class="preset-dots">
+            ${colors.slice(0,5).map(c => `<div class="preset-dot" style="background:${c}"></div>`).join('')}
+          </div>
+          ${name}`;
+        btn.onclick = () => buildColorGrid(colors);
+        container.appendChild(btn);
+      });
+    }
+
+    function save() {
+      const bgMap = {
+        dark:  '#0f172a',
+        light: '#f8fafc',
+        navy:  '#0a1628',
+        slate: '#1e293b',
+        custom: document.getElementById('customBgColor').value
+      };
+
+      tableau.extensions.settings.set('bgColor',  bgMap[currentBg]);
+      tableau.extensions.settings.set('maxLines', document.getElementById('maxLines').value);
+      tableau.extensions.settings.set('colors',   JSON.stringify(currentColors));
+
+      tableau.extensions.settings.saveAsync().then(() => {
+        tableau.extensions.ui.closeDialog('saved');
+      });
+    }
+
+    function cancel() {
+      tableau.extensions.ui.closeDialog('cancelled');
+    }
+
+    // Init
+    tableau.extensions.initializeDialogAsync().then((openPayload) => {
+      const savedBg     = tableau.extensions.settings.get('bgColor')  || '#0f172a';
+      const savedMax    = tableau.extensions.settings.get('maxLines') || '6';
+      const savedColors = JSON.parse(tableau.extensions.settings.get('colors') || 'null') || PALETTES["Tableau"];
+
+      // Map hex back to bg key
+      const hexToBg = {'#0f172a':'dark','#f8fafc':'light','#0a1628':'navy','#1e293b':'slate'};
+      const bgKey = hexToBg[savedBg] || 'custom';
+
+      buildPresets();
+      buildColorGrid(savedColors);
+      selectBg(bgKey);
+      if (bgKey === 'custom') document.getElementById('customBgColor').value = savedBg;
+
+      document.getElementById('maxLines').value = savedMax;
+      document.getElementById('maxLinesVal').textContent = savedMax;
+    });
+  </script>
+</body>
+</html>
