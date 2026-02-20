@@ -1,9 +1,7 @@
 /* ============================================================
    Donut Chart – Tableau Viz Extension
-   Built with D3.js v7 + Tableau Extensions API
    ============================================================ */
 
-// ── Colour palette (professional, Tableau-compatible) ──────
 const PALETTE = [
   '#2D6BE4', '#E8543A', '#2ECC8A', '#F5A623',
   '#9B59B6', '#1ABC9C', '#E74C3C', '#3498DB',
@@ -14,10 +12,8 @@ const PALETTE = [
 const color = d3.scaleOrdinal(PALETTE);
 let currentData = null;
 
-// ── Init ───────────────────────────────────────────────────
 tableau.extensions.initializeAsync().then(() => {
   const worksheet = tableau.extensions.worksheetContent.worksheet;
-
   renderFromWorksheet(worksheet);
 
   worksheet.addEventListener(
@@ -26,55 +22,120 @@ tableau.extensions.initializeAsync().then(() => {
   );
 
   window.addEventListener('resize', () => {
-    if (currentData) draw(currentData);
+    if (currentData && currentData.length > 0) draw(currentData);
   });
+
 }).catch(err => {
-  console.error('Tableau Extensions init error:', err);
+  console.error('Init error:', err);
   showEmpty();
 });
 
-// ── Fetch data from Tableau ────────────────────────────────
 async function renderFromWorksheet(worksheet) {
   try {
-    const encodingMap = worksheet.getEncodingMappings();
-    const sliceEncoding = encodingMap.get('slice');
-    const valueEncoding = encodingMap.get('value');
+    // Récupère toutes les données résumées
+    const dataTableReader = await worksheet.getSummaryDataReaderAsync(undefined, { ignoreSelection: true });
+    const dataTable = await dataTableReader.getAllPagesAsync();
+    await dataTableReader.releaseAsync();
 
-    if (!sliceEncoding || !valueEncoding) {
+    const columns = dataTable.columns;
+    const rows = dataTable.data;
+
+    if (!columns || columns.length === 0 || rows.length === 0) {
       showEmpty();
       return;
     }
 
-    const summaryData = await worksheet.getSummaryDataAsync();
-    const columns = summaryData.columns;
-    const rows = summaryData.data;
+    // Cherche les encodings slice et value
+    const encodingMap = worksheet.getEncodingMappings();
+    let sliceIdx = -1;
+    let valueIdx = -1;
 
-    const sliceIdx = columns.findIndex(c => c.fieldName === sliceEncoding.field.name);
-    const valueIdx = columns.findIndex(c => c.fieldName === valueEncoding.field.name);
+    // Essaie via encodings
+    if (encodingMap && encodingMap.size > 0) {
+      const sliceEncoding = encodingMap.get('slice');
+      const valueEncoding = encodingMap.get('value');
 
-    if (sliceIdx < 0 || valueIdx < 0) { showEmpty(); return; }
+      if (sliceEncoding) {
+        sliceIdx = columns.findIndex(c =>
+          c.fieldName === sliceEncoding.field.name ||
+          c.fieldName.includes(sliceEncoding.field.name)
+        );
+      }
+      if (valueEncoding) {
+        valueIdx = columns.findIndex(c =>
+          c.fieldName === valueEncoding.field.name ||
+          c.fieldName.includes(valueEncoding.field.name)
+        );
+      }
+    }
 
+    // Fallback : prend le premier string et le premier number
+    if (sliceIdx < 0 || valueIdx < 0) {
+      columns.forEach((col, i) => {
+        if (sliceIdx < 0 && col.dataType === 'string') sliceIdx = i;
+        if (valueIdx < 0 && (col.dataType === 'float' || col.dataType === 'int')) valueIdx = i;
+      });
+    }
+
+    if (sliceIdx < 0 || valueIdx < 0) {
+      showEmpty();
+      return;
+    }
+
+    // Parse les données
     const data = rows
       .map(row => ({
         label: row[sliceIdx].formattedValue,
-        value: +row[valueIdx].nativeValue
+        value: Math.abs(+row[valueIdx].nativeValue)
       }))
-      .filter(d => d.label && !isNaN(d.value) && d.value >= 0)
+      .filter(d => d.label && !isNaN(d.value) && d.value > 0)
       .sort((a, b) => b.value - a.value);
 
-    if (data.length === 0) { showEmpty(); return; }
+    if (data.length === 0) {
+      showEmpty();
+      return;
+    }
 
     currentData = data;
     hideEmpty();
     draw(data);
 
   } catch (err) {
-    console.error('Data fetch error:', err);
-    showEmpty();
+    console.error('Data error:', err);
+    // Essaie l'ancienne API en fallback
+    try {
+      const summaryData = await worksheet.getSummaryDataAsync({ ignoreSelection: true });
+      const columns = summaryData.columns;
+      const rows = summaryData.data;
+
+      let sliceIdx = -1, valueIdx = -1;
+      columns.forEach((col, i) => {
+        if (sliceIdx < 0 && col.dataType === 'string') sliceIdx = i;
+        if (valueIdx < 0 && (col.dataType === 'float' || col.dataType === 'int')) valueIdx = i;
+      });
+
+      if (sliceIdx < 0 || valueIdx < 0) { showEmpty(); return; }
+
+      const data = rows
+        .map(row => ({
+          label: row[sliceIdx].formattedValue,
+          value: Math.abs(+row[valueIdx].nativeValue)
+        }))
+        .filter(d => d.label && !isNaN(d.value) && d.value > 0)
+        .sort((a, b) => b.value - a.value);
+
+      if (data.length === 0) { showEmpty(); return; }
+
+      currentData = data;
+      hideEmpty();
+      draw(data);
+    } catch (err2) {
+      console.error('Fallback error:', err2);
+      showEmpty();
+    }
   }
 }
 
-// ── Draw ──────────────────────────────────────────────────
 function draw(data) {
   const wrap = document.getElementById('chart-wrap');
   const svg  = d3.select('#chart');
@@ -84,7 +145,7 @@ function draw(data) {
   const H = wrap.clientHeight;
   const size = Math.min(W, H);
   const outerR = (size / 2) * 0.78;
-  const innerR = outerR * 0.52;   // donut hole ratio
+  const innerR = outerR * 0.52;
   const cx = W / 2;
   const cy = H / 2;
 
@@ -92,62 +153,42 @@ function draw(data) {
 
   const g = svg.append('g').attr('transform', `translate(${cx},${cy})`);
 
-  // ── Arc generators ──
   const arc = d3.arc()
-    .innerRadius(innerR)
-    .outerRadius(outerR)
-    .padAngle(0.025)
-    .cornerRadius(3);
+    .innerRadius(innerR).outerRadius(outerR)
+    .padAngle(0.025).cornerRadius(3);
 
   const arcHover = d3.arc()
-    .innerRadius(innerR)
-    .outerRadius(outerR + 10)
-    .padAngle(0.025)
-    .cornerRadius(3);
+    .innerRadius(innerR).outerRadius(outerR + 10)
+    .padAngle(0.025).cornerRadius(3);
 
-  const pie = d3.pie()
-    .value(d => d.value)
-    .sort(null);
-
+  const pie = d3.pie().value(d => d.value).sort(null);
   const arcs = pie(data);
   const total = d3.sum(data, d => d.value);
 
-  // ── Slices ──
+  // Slices avec animation
   const slices = g.selectAll('.slice')
-    .data(arcs)
-    .enter()
+    .data(arcs).enter()
     .append('path')
     .attr('class', 'slice')
     .attr('fill', d => color(d.data.label))
     .attr('opacity', 0.92)
-    .style('cursor', 'pointer')
-    .style('transition', 'opacity 0.2s');
+    .style('cursor', 'pointer');
 
-  // Animate in
   slices
-    .attr('d', d => {
-      const start = { startAngle: d.startAngle, endAngle: d.startAngle };
-      return arc(start);
-    })
-    .transition()
-    .duration(700)
-    .delay((d, i) => i * 40)
+    .attr('d', d => arc({ startAngle: d.startAngle, endAngle: d.startAngle }))
+    .transition().duration(700).delay((d, i) => i * 40)
     .ease(d3.easeCubicOut)
     .attr('d', arc);
 
-  // ── Hover interactions ──
   const tooltip = document.getElementById('tooltip');
 
   slices
     .on('mouseover', function(event, d) {
       d3.select(this).attr('d', arcHover).attr('opacity', 1);
       const pct = ((d.data.value / total) * 100).toFixed(1);
-      tooltip.innerHTML = `
-        <div class="tt-name">${d.data.label}</div>
-        <div class="tt-value">${formatNum(d.data.value)} · ${pct}%</div>
-      `;
+      tooltip.innerHTML = `<div class="tt-name">${d.data.label}</div><div class="tt-value">${formatNum(d.data.value)} · ${pct}%</div>`;
       tooltip.style.opacity = 1;
-      updateCenterLabel(d.data.label, pct + '%');
+      updateCenter(d.data.label, pct + '%');
     })
     .on('mousemove', function(event) {
       tooltip.style.left = (event.clientX + 14) + 'px';
@@ -156,23 +197,15 @@ function draw(data) {
     .on('mouseout', function() {
       d3.select(this).attr('d', arc).attr('opacity', 0.92);
       tooltip.style.opacity = 0;
-      updateCenterLabel(null, null);
+      updateCenter(null, null);
     });
 
-  // ── Centre label ──
+  // Centre
   const centerG = g.append('g').attr('class', 'center-label');
+  const totalText = centerG.append('text').attr('class', 'cl-value').attr('y', -6).text(formatNum(total));
+  const subText   = centerG.append('text').attr('class', 'cl-name').attr('y', 14).text('Total');
 
-  const totalText = centerG.append('text')
-    .attr('class', 'cl-value')
-    .attr('y', -6)
-    .text(formatNum(total));
-
-  const subText = centerG.append('text')
-    .attr('class', 'cl-name')
-    .attr('y', 14)
-    .text('Total');
-
-  function updateCenterLabel(name, pct) {
+  function updateCenter(name, pct) {
     if (name) {
       totalText.text(pct);
       subText.text(name.length > 18 ? name.slice(0, 16) + '…' : name);
@@ -182,20 +215,16 @@ function draw(data) {
     }
   }
 
-  // ── Legend ──
   buildLegend(data, total);
 }
 
-// ── Legend ────────────────────────────────────────────────
 function buildLegend(data, total) {
   const legend = document.getElementById('legend');
   legend.innerHTML = '';
-
   data.forEach(d => {
     const pct = ((d.value / total) * 100).toFixed(1);
     const item = document.createElement('div');
     item.className = 'legend-item';
-
     item.innerHTML = `
       <div class="legend-swatch" style="background:${color(d.label)}"></div>
       <span class="legend-label" title="${d.label}">${d.label}</span>
@@ -205,7 +234,6 @@ function buildLegend(data, total) {
   });
 }
 
-// ── Helpers ───────────────────────────────────────────────
 function formatNum(n) {
   if (n >= 1_000_000) return (n / 1_000_000).toFixed(1) + 'M';
   if (n >= 1_000)     return (n / 1_000).toFixed(1) + 'K';
