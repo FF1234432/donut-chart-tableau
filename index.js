@@ -3,10 +3,22 @@
    ============================================================ */
 
 const PALETTE = [
-  '#2D6BE4', '#E8543A', '#2ECC8A', '#F5A623',
-  '#9B59B6', '#1ABC9C', '#E74C3C', '#3498DB',
-  '#F39C12', '#27AE60', '#8E44AD', '#16A085',
-  '#D35400', '#2980B9', '#C0392B', '#7F8C8D'
+  '#93c5fd', // pastel blue
+  '#86efac', // pastel green
+  '#c4b5fd', // pastel purple
+  '#6ee7b7', // pastel mint
+  '#a5b4fc', // pastel indigo
+  '#bfdbfe', // light blue
+  '#bbf7d0', // light green
+  '#ddd6fe', // light violet
+  '#7dd3fc', // sky blue
+  '#d9f99d', // pastel lime
+  '#e9d5ff', // soft lavender
+  '#99f6e4', // pastel teal
+  '#c7d2fe', // periwinkle
+  '#a7f3d0', // seafoam
+  '#f0abfc', // pastel pink-purple
+  '#67e8f9', // pastel cyan
 ];
 
 const color = d3.scaleOrdinal(PALETTE);
